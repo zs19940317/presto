@@ -37,7 +37,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.FunctionHandle;
-import com.facebook.presto.spi.function.FunctionImplementationType;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.function.SqlInvokedScalarFunctionImplementation;
 import com.facebook.presto.sql.InterpretedFunctionInvoker;
@@ -124,8 +123,6 @@ import static com.facebook.presto.common.type.VarcharType.createVarcharType;
 import static com.facebook.presto.metadata.CastType.CAST;
 import static com.facebook.presto.metadata.FunctionAndTypeManager.qualifyObjectName;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
-import static com.facebook.presto.spi.function.FunctionImplementationType.BUILTIN;
-import static com.facebook.presto.spi.function.FunctionImplementationType.SQL;
 import static com.facebook.presto.sql.analyzer.ConstantExpressionVerifier.verifyExpressionIsConstant;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.createConstantAnalyzer;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.getExpressionTypes;
@@ -941,24 +938,25 @@ public class ExpressionInterpreter
 
             Object result;
 
-            FunctionImplementationType implementationType = functionMetadata.getImplementationType();
-            if (implementationType.isExternal()) {
-                // do not interpret remote functions on coordinator
-                return new FunctionCall(node.getName(), node.getWindow(), node.isDistinct(), node.isIgnoreNulls(), toExpressions(argumentValues, argumentTypes));
-            }
-            else if (implementationType.equals(BUILTIN)) {
-                result = functionInvoker.invoke(functionHandle, session.getSqlFunctionProperties(), argumentValues);
-            }
-            else {
-                checkState(implementationType.equals(SQL));
-                Expression function = getSqlFunctionExpression(functionMetadata, (SqlInvokedScalarFunctionImplementation) metadata.getFunctionAndTypeManager().getScalarFunctionImplementation(functionHandle), metadata, session.getSqlFunctionProperties(), node.getArguments());
-                ExpressionInterpreter functionInterpreter = new ExpressionInterpreter(
-                        function,
-                        metadata,
-                        session,
-                        getExpressionTypes(session, metadata, new SqlParser(), TypeProvider.empty(), function, emptyList(), WarningCollector.NOOP),
-                        optimize);
-                result = functionInterpreter.visitor.process(function, context);
+            switch (functionMetadata.getImplementationType()) {
+                case BUILTIN:
+                    result = functionInvoker.invoke(functionHandle, session.getSqlFunctionProperties(), argumentValues);
+                    break;
+                case SQL:
+                    Expression function = getSqlFunctionExpression(functionMetadata, (SqlInvokedScalarFunctionImplementation) metadata.getFunctionAndTypeManager().getScalarFunctionImplementation(functionHandle), metadata, session.getSqlFunctionProperties(), node.getArguments());
+                    ExpressionInterpreter functionInterpreter = new ExpressionInterpreter(
+                            function,
+                            metadata,
+                            session,
+                            getExpressionTypes(session, metadata, new SqlParser(), TypeProvider.empty(), function, emptyList(), WarningCollector.NOOP),
+                            optimize);
+                    result = functionInterpreter.visitor.process(function, context);
+                    break;
+                case THRIFT:
+                    // do not interpret remote functions on coordinator
+                    return new FunctionCall(node.getName(), node.getWindow(), node.isDistinct(), node.isIgnoreNulls(), toExpressions(argumentValues, argumentTypes));
+                default:
+                    throw new IllegalArgumentException(format("Unsupported function implementation type: %s", functionMetadata.getImplementationType()));
             }
 
             if (optimize && !isSerializable(result, type(node))) {
