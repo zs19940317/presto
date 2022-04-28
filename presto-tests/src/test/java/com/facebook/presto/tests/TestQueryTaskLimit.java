@@ -86,7 +86,7 @@ public class TestQueryTaskLimit
         }
     }
 
-    @Test(timeOut = 30_000)
+    @Test(timeOut = 40_000)
     public void testQueuingWhenTaskLimitExceeds()
             throws Exception
     {
