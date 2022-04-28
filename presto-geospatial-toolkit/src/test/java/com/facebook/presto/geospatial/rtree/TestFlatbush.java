@@ -138,7 +138,7 @@ public class TestFlatbush
         assertEquals(findIntersections(rtree, new Rectangle(0, 0, 0, 0)), ImmutableList.of());
     }
 
-    @Test
+    @Test(enabled = false)
     public void testOctagonQuery()
     {
         OGCGeometryWrapper octagonA = new OGCGeometryWrapper(POLYGON_A);
