@@ -648,7 +648,7 @@ public class TestMemoryManager
         queryRunner2.execute(session, "SELECT COUNT(*), repeat(orderstatus, 1000) FROM orders GROUP BY 2");
     }
 
-    @Test(timeOut = 200_000, groups = {"queryMemoryPerNodeLimit"}, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded per-node user memory limit of 1kB.*")
+    @Test(timeOut = 300_000, groups = {"queryMemoryPerNodeLimit"}, expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Query exceeded per-node user memory limit of 1kB.*")
     public void testQueryMemoryPerNodeLimit()
     {
         Session session = testSessionBuilder()
