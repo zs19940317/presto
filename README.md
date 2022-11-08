@@ -109,3 +109,7 @@ To iterate quickly, simply re-build the project in IntelliJ after packaging is c
 
 When authoring a pull request, the PR description should include its relevant release notes.
 Follow [Release Notes Guidelines](https://github.com/prestodb/presto/wiki/Release-Notes-Guidelines) when authoring release notes. 
+
+## Questions?
+
+[Please join our Slack channel and ask in `#general`](https://join.slack.com/t/prestodb/shared_invite/zt-1jk2bmzi9-nvEfq5ZX1PDk4yQ0pXliCA).
