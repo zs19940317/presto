@@ -27,7 +27,7 @@ import java.util.List;
 
 public class PluginManagerConfig
 {
-    private File installedPluginsDir = new File("plugin");
+    private File installedPluginsDir = new File("E:\\code\\plugin");
     private List<String> plugins;
     private File pluginConfigurationDir = new File("etc/");
     private String mavenLocalRepository = ArtifactResolver.USER_LOCAL_REPO;

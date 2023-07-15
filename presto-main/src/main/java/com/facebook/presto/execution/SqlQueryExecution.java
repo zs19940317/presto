@@ -441,17 +441,22 @@ public class SqlQueryExecution
                 PlanRoot plan;
 
                 // set a thread timeout in case query analyzer ends up in an infinite loop
+                // 下面是个按时终止的超时线程，其使用了Thread的interrupt，以及一个超时时间，即使没用，
+                // 被该资源包裹，也会在规定时间内终止，防止死循环
                 try (TimeoutThread unused = new TimeoutThread(
                         Thread.currentThread(),
                         timeoutThreadExecutor,
                         getQueryAnalyzerTimeout(getSession()))) {
                     // create logical plan for the query
+                    // 创建逻辑计划，这里是第一个重大步骤，创建逻辑计划有初步优化。
+                    // 在此之前，已经创建PreparedQuery，也就是生成了SQL对应的抽象语法树，由antlr4解析而来。
                     plan = createLogicalPlanAndOptimize();
                 }
 
                 metadata.beginQuery(getSession(), plan.getConnectors());
 
                 // plan distribution of query
+                // 创建分布式执行计划
                 planDistribution(plan);
 
                 // transition to starting
@@ -461,9 +466,11 @@ public class SqlQueryExecution
                 }
 
                 // if query is not finished, start the scheduler, otherwise cancel it
+                // 获取调度器
                 SqlQuerySchedulerInterface scheduler = queryScheduler.get();
 
                 if (!stateMachine.isDone()) {
+                    // 开始执行调度
                     scheduler.start();
                 }
             }
@@ -515,13 +522,17 @@ public class SqlQueryExecution
     private PlanRoot createLogicalPlanAndOptimize()
     {
         try {
-            // time analysis phase
+            // time analysis phase；状态机是查询辅助手段，记录了整个查询链路的状态
             stateMachine.beginAnalysis();
 
+            // 创建逻辑计划，
             PlanNode planNode = stateMachine.getSession().getRuntimeStats().profileNanos(
                     LOGICAL_PLANNER_TIME_NANOS,
+                    // queryAnalysis具体实现类是[[BuiltInQueryAnalysis]]，里面包装了Analysis，Analysis包装了
+                    // Statement，即抽象语法树
                     () -> queryAnalyzer.plan(this.analyzerContext, queryAnalysis));
 
+            // 创建优化器
             Optimizer optimizer = new Optimizer(
                     stateMachine.getSession(),
                     metadata,
@@ -537,6 +548,7 @@ public class SqlQueryExecution
 
             Plan plan = getSession().getRuntimeStats().profileNanos(
                     OPTIMIZER_TIME_NANOS,
+                    // 执行验证和优化
                     () -> optimizer.validateAndOptimizePlan(planNode, OPTIMIZED_AND_VALIDATED));
 
             queryPlan.set(plan);
@@ -551,6 +563,7 @@ public class SqlQueryExecution
             Optional<Output> output = new OutputExtractor().extractOutput(plan.getRoot());
             stateMachine.setOutput(output);
 
+            // 分割计划，是否分割根据的是否有shuffle
             // fragment the plan
             // the variableAllocator is finally passed to SqlQueryScheduler for runtime cost-based optimizations
             variableAllocator.set(new VariableAllocator(plan.getTypes().allVariables()));
@@ -805,8 +818,11 @@ public class SqlQueryExecution
 
     private static class PlanRoot
     {
+        // 逻辑计划树，总结的是整个SQL的组成情况
         private final SubPlan root;
         private final boolean summarizeTaskInfos;
+
+        // 使用的连接器的信息，因为presto支持同时连接多个数据源进行查询
         private final Set<ConnectorId> connectors;
 
         public PlanRoot(SubPlan root, boolean summarizeTaskInfos, Set<ConnectorId> connectors)
